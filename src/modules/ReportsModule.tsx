@@ -18,6 +18,7 @@ import {
   buildSmsUrl,
   buildWhatsAppUrl,
 } from '../utils/labCalculations';
+import { openExternalActionUrl } from '../utils/nativeBridge';
 import { generateLabReportPdf } from '../utils/pdfGenerator';
 
 const STATUS_TABS: { id: 'all' | LabReport['status']; label: string }[] = [
@@ -146,7 +147,7 @@ export const ReportsModule: React.FC = () => {
     }\nPlease collect or request your official PDF report.`;
 
     const url = channel === 'whatsapp' ? buildWhatsAppUrl(mobile, msg) : buildSmsUrl(mobile, msg);
-    window.open(url, '_blank', 'noopener,noreferrer');
+    await openExternalActionUrl(url);
     await logNotification({
       patientId: report.patientId,
       patientName: report.patientName,

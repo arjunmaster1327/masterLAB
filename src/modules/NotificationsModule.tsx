@@ -3,6 +3,7 @@ import { MessageSquare, Send, Smartphone } from 'lucide-react';
 import { useLab } from '../context/LabContext';
 import type { NotificationLog } from '../types/lab';
 import { buildSmsUrl, buildWhatsAppUrl, formatCurrency } from '../utils/labCalculations';
+import { openExternalActionUrl } from '../utils/nativeBridge';
 
 export const NotificationsModule: React.FC = () => {
   const { bookings, notifications, settings, logNotification, pushToast } = useLab();
@@ -52,7 +53,7 @@ export const NotificationsModule: React.FC = () => {
       channel === 'whatsapp'
         ? buildWhatsAppUrl(mobile.trim(), message.trim())
         : buildSmsUrl(mobile.trim(), message.trim());
-    window.open(url, '_blank', 'noopener,noreferrer');
+    await openExternalActionUrl(url);
 
     await logNotification({
       patientName: patientName.trim(),

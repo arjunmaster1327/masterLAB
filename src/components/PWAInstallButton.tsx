@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Download } from 'lucide-react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
+import { isNativePlatform } from '../utils/nativeBridge';
 
 export const PWAInstallButton: React.FC = () => {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
 
-  if (isInstalled) return null;
+  if (isNativePlatform() || isInstalled) return null;
 
   if (isInstallable) {
     return (

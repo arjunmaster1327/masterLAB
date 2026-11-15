@@ -11,6 +11,7 @@ import {
 import { useLab } from '../context/LabContext';
 import type { Booking, BookingTestItem, Patient } from '../types/lab';
 import { buildWhatsAppUrl, formatCurrency } from '../utils/labCalculations';
+import { openExternalActionUrl } from '../utils/nativeBridge';
 import { generateInvoicePdf } from '../utils/pdfGenerator';
 import { BarcodeCanvas, PrintStickerButton } from '../components/BarcodeCanvas';
 
@@ -50,7 +51,8 @@ export const BookingsModule: React.FC = () => {
 
   const [doctorId, setDoctorId] = useState('');
   const [testSearch, setTestSearch] = useState('');
-  const [selectedTestIds, setSelectedTestIds] = useState<string[]>([]);\n  const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
+  const [selectedTestIds, setSelectedTestIds] = useState<string[]>([]);
+  const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
   const [discount, setDiscount] = useState('0');
   const [discountReason, setDiscountReason] = useState('');
   const [collectionType, setCollectionType] = useState<'walk_in' | 'home_collection'>('walk_in');
@@ -177,6 +179,7 @@ export const BookingsModule: React.FC = () => {
       });
       setLastBooking(created);
       setSelectedTestIds([]);
+      setSelectedPackageId(null);
       setDiscount('0');
       setDiscountReason('');
       setPaidInput('');
@@ -194,7 +197,7 @@ export const BookingsModule: React.FC = () => {
       return;
     }
     const message = `Hello ${b.patientName}, your test booking at ${settings.labName} is confirmed.\nAccession: ${b.accessionNo}\nTests: ${b.testItems.map((t) => t.testCode).join(', ')}\nTotal: ${formatCurrency(b.netAmount)} | Paid: ${formatCurrency(b.paidAmount)} | Due: ${formatCurrency(b.dueAmount)}.`;
-    window.open(buildWhatsAppUrl(b.patientMobile, message), '_blank', 'noopener,noreferrer');
+    await openExternalActionUrl(buildWhatsAppUrl(b.patientMobile, message));
     await logNotification({
       patientId: b.patientId,
       patientName: b.patientName,

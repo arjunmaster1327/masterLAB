@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import JsBarcode from 'jsbarcode';
+import jsPDF from 'jspdf';
 import { Printer } from 'lucide-react';
+import { isNativePlatform, saveOrShareBlob } from '../utils/nativeBridge';
 
 interface BarcodeCanvasProps {
   value: string;
@@ -61,6 +63,29 @@ export function printSpecimenSticker(
     return;
   }
   const dataUrl = canvas.toDataURL('image/png');
+  if (isNativePlatform()) {
+    const labelDoc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: [80, 45],
+    });
+    labelDoc.setFont('helvetica', 'bold');
+    labelDoc.setFontSize(10);
+    labelDoc.text(patientName.slice(0, 32), 5, 8);
+    labelDoc.setFont('helvetica', 'normal');
+    labelDoc.setFontSize(8);
+    labelDoc.text(`${sampleType}${tubeColor ? ` · ${tubeColor}` : ''}`, 5, 13);
+    labelDoc.addImage(dataUrl, 'PNG', 5, 16, 70, 24);
+    const pdfBlob = labelDoc.output('blob');
+    void saveOrShareBlob({
+      fileName: `Label_${accessionNo}.pdf`,
+      blob: pdfBlob,
+      title: `Specimen Label ${accessionNo}`,
+      text: `Specimen barcode label for ${patientName} (${accessionNo})`,
+    });
+    return;
+  }
+
   const win = window.open('', '_blank', 'width=420,height=280');
   if (!win) return;
   win.document.write(`

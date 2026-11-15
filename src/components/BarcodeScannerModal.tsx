@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Camera, Keyboard, X } from 'lucide-react';
+import { Camera, Keyboard, RefreshCw, X } from 'lucide-react';
+import { requestNativeCameraPermission } from '../utils/nativeBridge';
 
 interface BarcodeScannerModalProps {
   isOpen: boolean;
@@ -16,7 +17,20 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   const [manualCode, setManualCode] = useState('');
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+
+  const stopScanner = useCallback(() => {
+    if (scannerRef.current) {
+      const current = scannerRef.current;
+      scannerRef.current = null;
+      current
+        .stop()
+        .then(() => current.clear())
+        .catch(() => {});
+    }
+    setCameraActive(false);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -26,6 +40,18 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
     const startScanner = async () => {
       try {
         setCameraError(null);
+        const granted = await requestNativeCameraPermission();
+        if (!granted) {
+          if (!cancelled) {
+            setCameraActive(false);
+            setCameraError(
+              'Camera permission denied. Allow Camera permission in Android App Settings or enter barcode manually below.'
+            );
+          }
+          return;
+        }
+        if (cancelled) return;
+
         const scanner = new Html5Qrcode(regionId);
         scannerRef.current = scanner;
         await scanner.start(
@@ -61,16 +87,9 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
     return () => {
       cancelled = true;
       clearTimeout(timer);
-      if (scannerRef.current) {
-        scannerRef.current
-          .stop()
-          .then(() => scannerRef.current?.clear())
-          .catch(() => {});
-        scannerRef.current = null;
-      }
-      setCameraActive(false);
+      stopScanner();
     };
-  }, [isOpen, onDetected, onClose]);
+  }, [isOpen, onDetected, onClose, retryToken, stopScanner]);
 
   if (!isOpen) return null;
 
@@ -104,11 +123,22 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           <div className="rounded-xl border border-slate-200 bg-slate-950 overflow-hidden min-h-[200px] flex items-center justify-center relative">
             <div id="mcl-barcode-reader" className="w-full" />
             {!cameraActive && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center text-slate-300 text-xs">
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center text-slate-300 text-xs gap-2">
                 {cameraError ? (
                   <>
-                    <p className="font-medium text-amber-300 mb-1">Camera Scanner Unavailable</p>
+                    <p className="font-medium text-amber-300">Camera Scanner Unavailable</p>
                     <p className="text-slate-400">{cameraError}</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        stopScanner();
+                        setRetryToken((n) => n + 1);
+                      }}
+                      className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Retry Camera
+                    </button>
                   </>
                 ) : (
                   <p>Initializing camera feed...</p>

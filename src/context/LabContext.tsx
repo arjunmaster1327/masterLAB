@@ -1,8 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
-import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch, db } from '../lib/localFirestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, writeBatch, db } from '../lib/localFirestore';
 import {
-  auth,
   createSafeId,
   handleFirestoreError,
   OperationType,
@@ -215,12 +214,10 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Local-only mode: no Firebase connection is attempted.
 
-  // Local device administrator. No Google account or cloud authentication is used.\n  const isUserActive =
-    !!authUser &&
-    (userProfile?.status === 'active' ||
-      authUser.email?.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase());
+  // Local device administrator. No Google account or cloud authentication is used.
+  const isUserActive = !!authUser && userProfile?.status === 'active';
 
-  const actualRole: UserRole = userProfile?.role || (authUser?.email?.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase() ? 'admin' : 'staff');
+  const actualRole: UserRole = userProfile?.role || 'admin';
   const effectiveRole: UserRole = actualRole === 'admin' && previewRole ? previewRole : actualRole;
 
   const effectivePermissions: ModuleId[] = useMemo(() => {
@@ -316,7 +313,7 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         : collection(db, colName);
       const u = onSnapshot(
         q,
-        (snap) => {
+        (snap: { docs: Array<{ id: string; data: () => Record<string, unknown> }> }) => {
           const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as T);
           setter(items);
         },

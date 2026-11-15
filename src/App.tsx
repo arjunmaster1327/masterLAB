@@ -1,4 +1,4 @@
-import React, { Component, useMemo, useState } from 'react';
+import React, { Component, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart3,
   Bell,
@@ -24,6 +24,7 @@ import {
 import { LabProvider, useLab } from './context/LabContext';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { PWAInstallButton } from './components/PWAInstallButton';
+import { initNativeAndroidShell } from './utils/nativeBridge';
 import type { ModuleId, UserRole } from './types/lab';
 import labLogoImg from './assets/images/lab_logo_crest_1794746419559.jpg';
 import pathologistAvatarImg from './assets/images/lab_avatar_pathologist_1794746421267.jpg';
@@ -114,6 +115,29 @@ const LabShell: React.FC = () => {
   const isOnline = useOnlineStatus();
   const [activeModule, setActiveModule] = useState<ModuleId>('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navStateRef = useRef({ activeModule, mobileMenuOpen });
+  navStateRef.current = { activeModule, mobileMenuOpen };
+
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+    initNativeAndroidShell(() => {
+      if (navStateRef.current.mobileMenuOpen) {
+        setMobileMenuOpen(false);
+        return true;
+      }
+      if (navStateRef.current.activeModule !== 'dashboard') {
+        setActiveModule('dashboard');
+        return true;
+      }
+      return false;
+    }).then((fn) => {
+      cleanup = fn;
+    });
+    return () => {
+      cleanup?.();
+    };
+  }, []);
 
   const visibleNav = useMemo(
     () => NAV_ITEMS.filter((item) => hasPermission(item.id)),

@@ -178,8 +178,7 @@ export const DEFAULT_LAB_TESTS: DefaultTestSeed[] = [
       { key: 'potassium', name: 'Potassium (K+)', unit: 'mmol/L', refMinMale: 3.5, refMaxMale: 5.1, refMinFemale: 3.5, refMaxFemale: 5.1, inputType: 'number' },
       { key: 'chloride', name: 'Chloride (Cl-)', unit: 'mmol/L', refMinMale: 98, refMaxMale: 107, refMinFemale: 98, refMaxFemale: 107, inputType: 'number' },
     ],
-  },,
-
+  },
   {
     code: 'ESR', name: 'ESR (Erythrocyte Sedimentation Rate)', department: 'Hematology',
     sampleType: 'EDTA Whole Blood', price: 120, turnaroundHours: 4, isActive: true,

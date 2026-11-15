@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { Booking, CashbookEntry, Patient } from '../types/lab';
+import { isNativePlatform, saveOrShareBlob } from './nativeBridge';
 
 export function exportBusinessReportExcel(
   periodLabel: string,
@@ -66,5 +67,19 @@ export function exportBusinessReportExcel(
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cashbookRows), 'Cashbook');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(patientRows), 'Patients');
 
-  XLSX.writeFile(wb, `MCL_Report_${periodLabel.replace(/\s+/g, '_')}.xlsx`);
+  const fileName = `MCL_Report_${periodLabel.replace(/\s+/g, '_')}.xlsx`;
+  if (isNativePlatform()) {
+    const arrayBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
+    const blob = new Blob([arrayBuffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    void saveOrShareBlob({
+      fileName,
+      blob,
+      title: `MasterLab Excel Report (${periodLabel})`,
+      text: `Master Computerized Laboratory Spreadsheet (${periodLabel})`,
+    });
+  } else {
+    XLSX.writeFile(wb, fileName);
+  }
 }

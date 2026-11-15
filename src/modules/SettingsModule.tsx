@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Download, Save, ShieldAlert, Upload } from 'lucide-react';
 import { useLab } from '../context/LabContext';
 import { todayISO } from '../utils/labCalculations';
+import { saveOrShareBlob } from '../utils/nativeBridge';
 
 function compressImageFile(file: File, maxWidth: number): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -104,14 +105,14 @@ export const SettingsModule: React.FC = () => {
       cashbook,
     };
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `MCL_Backup_${todayISO()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    await saveOrShareBlob({
+      fileName: `MCL_Backup_${todayISO()}.json`,
+      blob,
+      title: `MasterLab Backup (${todayISO()})`,
+      text: 'Full laboratory database backup (JSON)',
+    });
     await saveSettings({ lastBackupAt: new Date().toISOString() });
-    pushToast('success', 'Full encrypted cloud JSON backup downloaded.');
+    pushToast('success', 'Full encrypted cloud JSON backup exported.');
   };
 
   const handleRestoreFile = async (e: React.ChangeEvent<HTMLInputElement>) => {

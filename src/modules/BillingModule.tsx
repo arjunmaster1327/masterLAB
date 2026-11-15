@@ -11,6 +11,7 @@ import {
 import { useLab } from '../context/LabContext';
 import type { Booking } from '../types/lab';
 import { buildWhatsAppUrl, formatCurrency } from '../utils/labCalculations';
+import { openExternalActionUrl } from '../utils/nativeBridge';
 import { generateInvoicePdf } from '../utils/pdfGenerator';
 
 export const BillingModule: React.FC = () => {
@@ -81,7 +82,7 @@ export const BillingModule: React.FC = () => {
       return;
     }
     const msg = `Payment Receipt - ${settings.labName}\nPatient: ${b.patientName}\nAccession: ${b.accessionNo}\nNet Bill: ${formatCurrency(b.netAmount)}\nPaid: ${formatCurrency(b.paidAmount)}\nBalance Due: ${formatCurrency(b.dueAmount)}`;
-    window.open(buildWhatsAppUrl(b.patientMobile, msg), '_blank', 'noopener,noreferrer');
+    await openExternalActionUrl(buildWhatsAppUrl(b.patientMobile, msg));
     await logNotification({
       patientId: b.patientId,
       patientName: b.patientName,

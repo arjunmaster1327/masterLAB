@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable';
 import JsBarcode from 'jsbarcode';
 import type { Booking, CashbookEntry, LabReport, LabSettings, Payment } from '../types/lab';
 import { formatCurrency } from './labCalculations';
+import { isNativePlatform, saveOrShareBlob } from './nativeBridge';
 import defaultLogoUrl from '../assets/images/lab_logo_crest_1794746419559.jpg';
 
 function loadImageDataUrl(src: string): Promise<string | null> {
@@ -236,12 +237,21 @@ export async function generateLabReportPdf(
     287
   );
 
-  if (mode === 'print') {
+  const fileName = `${report.accessionNo}_${report.patientName.replace(/\s+/g, '_')}_Report.pdf`;
+  if (isNativePlatform()) {
+    const pdfBlob = doc.output('blob');
+    await saveOrShareBlob({
+      fileName,
+      blob: pdfBlob,
+      title: `Lab Report ${report.accessionNo}`,
+      text: `Diagnostic Report for ${report.patientName} (${report.accessionNo})`,
+    });
+  } else if (mode === 'print') {
     doc.autoPrint();
     const blobUrl = doc.output('bloburl');
     window.open(blobUrl, '_blank', 'noopener,noreferrer');
   } else {
-    doc.save(`${report.accessionNo}_${report.patientName.replace(/\s+/g, '_')}_Report.pdf`);
+    doc.save(fileName);
   }
 }
 
@@ -322,12 +332,21 @@ export async function generateInvoicePdf(
     });
   }
 
-  if (mode === 'print') {
+  const fileName = `${booking.accessionNo}_Invoice.pdf`;
+  if (isNativePlatform()) {
+    const pdfBlob = doc.output('blob');
+    await saveOrShareBlob({
+      fileName,
+      blob: pdfBlob,
+      title: `Invoice ${booking.accessionNo}`,
+      text: `Tax Invoice for ${booking.patientName} (${booking.accessionNo})`,
+    });
+  } else if (mode === 'print') {
     doc.autoPrint();
     const blobUrl = doc.output('bloburl');
     window.open(blobUrl, '_blank', 'noopener,noreferrer');
   } else {
-    doc.save(`${booking.accessionNo}_Invoice.pdf`);
+    doc.save(fileName);
   }
 }
 
@@ -384,5 +403,16 @@ export function generateFinancialReportPdf(
     styles: { fontSize: 8.5 },
   });
 
-  doc.save(`MCL_Business_Report_${periodLabel.replace(/\s+/g, '_')}.pdf`);
+  const fileName = `MCL_Business_Report_${periodLabel.replace(/\s+/g, '_')}.pdf`;
+  if (isNativePlatform()) {
+    const pdfBlob = doc.output('blob');
+    void saveOrShareBlob({
+      fileName,
+      blob: pdfBlob,
+      title: `${title} (${periodLabel})`,
+      text: `Business & Financial Report - ${periodLabel}`,
+    });
+  } else {
+    doc.save(fileName);
+  }
 }

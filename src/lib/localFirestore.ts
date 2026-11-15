@@ -20,7 +20,10 @@ export async function getDocs(ref: Ref) {
   const all = read(); const prefix = ref.path.replace(/\/$/, '') + '/';
   let rows = Object.entries(all).filter(([path]) => path.startsWith(prefix) && !path.slice(prefix.length).includes('/'));
   rows = rows.filter(([, value]) => (ref.filters || []).every(f => f.op === '==' ? value?.[f.field] === f.value : f.op === '!=' ? value?.[f.field] !== f.value : true));
-  if (ref.sort) rows.sort((a,b) => String(a[1]?.[ref.sort!.field] ?? '').localeCompare(String(b[1]?.[ref.sort!.field] ?? '')) * (ref.sort.direction === 'desc' ? -1 : 1));
+  if (ref.sort) {
+    const sort = ref.sort;
+    rows.sort((a, b) => String(a[1]?.[sort.field] ?? '').localeCompare(String(b[1]?.[sort.field] ?? '')) * (sort.direction === 'desc' ? -1 : 1));
+  }
   const docs = rows.map(([path,value]) => snap(path.split('/').pop() || '', value));
   return { docs, empty: docs.length === 0, size: docs.length };
 }

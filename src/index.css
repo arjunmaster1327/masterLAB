@@ -10,6 +10,12 @@
   html {
     font-family: var(--font-sans);
     scroll-behavior: smooth;
+    overscroll-behavior-y: contain;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   h1, h2, h3, h4, .font-display {
