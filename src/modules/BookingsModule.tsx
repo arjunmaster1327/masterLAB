@@ -123,6 +123,9 @@ export const BookingsModule: React.FC = () => {
   };
 
   const toggleTest = (id: string) => {
+    setSelectedPackageId(null);
+    setDiscount('0');
+    setDiscountReason('');
     setSelectedTestIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
