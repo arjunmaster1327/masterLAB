@@ -4,7 +4,6 @@ const config: CapacitorConfig = {
   appId: 'com.masterlab.diagnostics',
   appName: 'Master Lab',
   webDir: 'dist',
-  bundledWebRuntime: false,
   android: {
     allowMixedContent: false
   }
