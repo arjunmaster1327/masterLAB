@@ -1,35 +1,12 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import {
-  onAuthStateChanged,
-  signInWithPopup,
-  signOut,
-  type User,
-} from 'firebase/auth';
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  where,
-  writeBatch,
-} from 'firebase/firestore';
+import type { User } from 'firebase/auth';
+import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch, db } from '../lib/localFirestore';
 import {
   auth,
-  BOOTSTRAP_ADMIN_EMAIL,
   createSafeId,
-  db,
-  googleProvider,
   handleFirestoreError,
   OperationType,
   stripUndefined,
-  testFirestoreConnection,
 } from '../lib/firebase';
 import { DEFAULT_LAB_TESTS } from '../data/defaultTests';
 import {
@@ -195,10 +172,15 @@ const DEFAULT_SETTINGS: LabSettings = {
 const LabContext = createContext<LabContextValue | null>(null);
 
 export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [authUser, setAuthUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [userProfile, setUserProfile] = useState<UserAccount | null>(null);
-  const [profileLoading, setProfileLoading] = useState(false);
+  const localUser = { uid: 'local-admin', email: 'local@masterlab.device', displayName: 'Lab Administrator', photoURL: null } as unknown as User;
+  const [authUser] = useState<User | null>(localUser);
+  const [authLoading] = useState(false);
+  const [userProfile] = useState<UserAccount | null>({
+    id: 'local-admin', uid: 'local-admin', displayName: 'Lab Administrator', role: 'admin',
+    department: 'Administration', status: 'active', permissions: ROLE_DEFAULT_PERMISSIONS.admin,
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+  });
+  const [profileLoading] = useState(false);
   const [previewRole, setPreviewRole] = useState<UserRole | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -231,89 +213,9 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  useEffect(() => {
-    testFirestoreConnection();
-  }, []);
+  // Local-only mode: no Firebase connection is attempted.
 
-  // Auth & User Profile Bootstrap
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      setAuthUser(user);
-      setAuthLoading(false);
-      if (!user) {
-        setUserProfile(null);
-        setPreviewRole(null);
-        return;
-      }
-
-      setProfileLoading(true);
-      try {
-        const userRef = doc(db, 'users', user.uid);
-        const snap = await getDoc(userRef);
-
-        if (snap.exists()) {
-          setUserProfile({ id: snap.id, ...snap.data() } as UserAccount);
-        } else {
-          const isBootstrap = user.email?.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase();
-          let assignedRole: UserRole = isBootstrap ? 'admin' : 'staff';
-          let assignedStatus: 'active' | 'inactive' = isBootstrap ? 'active' : 'inactive';
-          let assignedPerms: ModuleId[] = isBootstrap ? ROLE_DEFAULT_PERMISSIONS.admin : ROLE_DEFAULT_PERMISSIONS.staff;
-          let assignedDept = isBootstrap ? 'Administration' : 'General';
-          let inviteId: string | undefined;
-
-          if (!isBootstrap && user.email) {
-            const inviteQ = query(
-              collection(db, 'staffInvites'),
-              where('email', '==', user.email.toLowerCase())
-            );
-            const inviteSnap = await getDocs(inviteQ);
-            if (!inviteSnap.empty) {
-              const invDoc = inviteSnap.docs[0];
-              const invData = invDoc.data() as StaffInvite;
-              assignedRole = invData.role;
-              assignedStatus = 'active';
-              assignedPerms = invData.permissions;
-              assignedDept = invData.department || 'Laboratory';
-              inviteId = invDoc.id;
-            }
-          }
-
-          const newAccountPayload = stripUndefined({
-            uid: user.uid,
-            displayName: user.displayName || user.email?.split('@')[0] || 'Lab Staff',
-            role: assignedRole,
-            department: assignedDept,
-            status: assignedStatus,
-            permissions: assignedPerms,
-            inviteId,
-            avatarUrl: user.photoURL || undefined,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          });
-
-          await setDoc(userRef, newAccountPayload);
-          await setDoc(doc(db, 'users', user.uid, 'private', 'contact'), {
-            uid: user.uid,
-            email: (user.email || '').toLowerCase(),
-            updatedAt: serverTimestamp(),
-          });
-
-          const createdSnap = await getDoc(userRef);
-          if (createdSnap.exists()) {
-            setUserProfile({ id: createdSnap.id, ...createdSnap.data() } as UserAccount);
-          }
-        }
-      } catch (error) {
-        console.error('Profile initialization error:', error);
-        pushToast('error', 'Failed to load staff profile permissions.');
-      } finally {
-        setProfileLoading(false);
-      }
-    });
-    return () => unsub();
-  }, [pushToast]);
-
-  const isUserActive =
+  // Local device administrator. No Google account or cloud authentication is used.\n  const isUserActive =
     !!authUser &&
     (userProfile?.status === 'active' ||
       authUser.email?.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase());
@@ -462,19 +364,12 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [authUser, isUserActive, actualRole]);
 
   const signInWithGoogle = useCallback(async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-      pushToast('success', 'Signed in successfully.');
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Sign-in cancelled or failed.';
-      pushToast('error', msg);
-    }
+    pushToast('info', 'This device-only app does not use Google sign-in.');
   }, [pushToast]);
 
   const logout = useCallback(async () => {
-    await signOut(auth);
     setPreviewRole(null);
-    pushToast('info', 'Signed out of laboratory session.');
+    pushToast('info', 'Local administrator session remains available on this device.');
   }, [pushToast]);
 
   const logAudit = useCallback(
