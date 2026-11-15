@@ -41,8 +41,13 @@ jobs:
       - name: Build web application
         run: npm run build
 
-      - name: Generate Android project
-        run: npx cap add android
+      - name: Generate Android project if missing
+        run: |
+          if [ ! -d android ]; then
+            npx cap add android
+          else
+            echo "Existing Android project found; reusing it."
+          fi
 
       - name: Sync web assets to Android
         run: npx cap sync android
