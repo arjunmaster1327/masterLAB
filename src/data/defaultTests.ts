@@ -178,5 +178,36 @@ export const DEFAULT_LAB_TESTS: DefaultTestSeed[] = [
       { key: 'potassium', name: 'Potassium (K+)', unit: 'mmol/L', refMinMale: 3.5, refMaxMale: 5.1, refMinFemale: 3.5, refMaxFemale: 5.1, inputType: 'number' },
       { key: 'chloride', name: 'Chloride (Cl-)', unit: 'mmol/L', refMinMale: 98, refMaxMale: 107, refMinFemale: 98, refMaxFemale: 107, inputType: 'number' },
     ],
+  },,
+
+  {
+    code: 'ESR', name: 'ESR (Erythrocyte Sedimentation Rate)', department: 'Hematology',
+    sampleType: 'EDTA Whole Blood', price: 120, turnaroundHours: 4, isActive: true,
+    parameters: [{ key: 'esr', name: 'ESR', unit: 'mm/hr', refMinMale: 0, refMaxMale: 15, refMinFemale: 0, refMaxFemale: 20, inputType: 'number' }],
+  },
+  {
+    code: 'BLOODGROUP', name: 'Blood Group & Rh Typing', department: 'Hematology',
+    sampleType: 'EDTA Whole Blood', price: 150, turnaroundHours: 2, isActive: true,
+    parameters: [{ key: 'abo', name: 'ABO Group', unit: '-', refText: 'A / B / AB / O', inputType: 'text' }, { key: 'rh', name: 'Rh Type', unit: '-', refText: 'Positive / Negative', inputType: 'text' }],
+  },
+  {
+    code: 'CRP', name: 'C-Reactive Protein (CRP)', department: 'Biochemistry',
+    sampleType: 'Serum (SST)', price: 350, turnaroundHours: 6, isActive: true,
+    parameters: [{ key: 'crp', name: 'CRP', unit: 'mg/L', refMinMale: 0, refMaxMale: 5, refMinFemale: 0, refMaxFemale: 5, inputType: 'number' }],
+  },
+  {
+    code: 'URINE_MICROALBUMIN', name: 'Urine Microalbumin', department: 'Clinical Pathology',
+    sampleType: 'Urine', price: 450, turnaroundHours: 6, isActive: true,
+    parameters: [{ key: 'microalbumin', name: 'Urine Microalbumin', unit: 'mg/L', refMinMale: 0, refMaxMale: 30, refMinFemale: 0, refMaxFemale: 30, inputType: 'number' }],
+  },
+  {
+    code: 'URINE_PREG', name: 'Urine Pregnancy Test (UPT)', department: 'Clinical Pathology',
+    sampleType: 'Urine', price: 150, turnaroundHours: 2, isActive: true,
+    parameters: [{ key: 'upt', name: 'Pregnancy Test', unit: '-', refText: 'Negative', inputType: 'text' }],
+  },
+  {
+    code: 'URINE_CULTURE', name: 'Urine Culture & Sensitivity', department: 'Microbiology',
+    sampleType: 'Urine (Sterile Container)', price: 600, turnaroundHours: 48, isActive: true,
+    parameters: [{ key: 'culture', name: 'Culture Growth', unit: '-', refText: 'No significant growth', inputType: 'text' }, { key: 'organism', name: 'Organism Isolated', unit: '-', refText: 'None', inputType: 'text' }],
   },
 ];
