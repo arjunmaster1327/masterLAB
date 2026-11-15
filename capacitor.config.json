@@ -1,0 +1,8 @@
+{
+  "appId": "com.masterlab.diagnostics",
+  "appName": "Master Lab",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false
+  }
+}
