@@ -24,12 +24,18 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.email_verified == true;
     }
 
+    function authEmailLower() {
+      return ('email' in request.auth.token && request.auth.token.email is string)
+        ? request.auth.token.email.lower()
+        : '';
+    }
+
     function isOwner(uid) {
       return isSignedIn() && request.auth.uid == uid;
     }
 
     function isBootstrapAdmin() {
-      return isSignedIn() && request.auth.token.email == 'arjunmaster1327@gmail.com';
+      return isSignedIn() && authEmailLower() == 'arjunmaster1327@gmail.com';
     }
 
     function userDocExists() {
@@ -369,7 +375,7 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow get: if isValidId(userId) && (isOwner(userId) || isActiveStaff());
-      allow list: if isActiveStaff() && resource.data.uid != '';
+      allow list: if isActiveStaff();
       allow create: if isValidId(userId) && isSignedIn() && isValidUserAccount(incoming())
         && incoming().uid == userId
         && incoming().createdAt == request.time
@@ -381,7 +387,7 @@ service cloud.firestore {
             isOwner(userId)
             && 'inviteId' in incoming()
             && exists(/databases/$(database)/documents/staffInvites/$(incoming().inviteId))
-            && get(/databases/$(database)/documents/staffInvites/$(incoming().inviteId)).data.email == request.auth.token.email
+            && get(/databases/$(database)/documents/staffInvites/$(incoming().inviteId)).data.email == authEmailLower()
             && get(/databases/$(database)/documents/staffInvites/$(incoming().inviteId)).data.role == incoming().role
             && incoming().status == 'active'
           )
@@ -405,7 +411,7 @@ service cloud.firestore {
 
       match /private/{docId} {
         allow get: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin());
-        allow list: if isValidId(userId) && (isOwner(userId) || isAdmin()) && resource.data.uid == userId;
+        allow list: if isValidId(userId) && (isOwner(userId) || isAdmin());
         allow create, update: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin())
           && isValidUserPrivate(incoming())
           && incoming().uid == userId
@@ -415,8 +421,8 @@ service cloud.firestore {
     }
 
     match /staffInvites/{inviteId} {
-      allow get: if isValidId(inviteId) && isSignedIn() && (isManagerOrAdmin() || resource.data.email == request.auth.token.email);
-      allow list: if isSignedIn() && (isManagerOrAdmin() || resource.data.email == request.auth.token.email);
+      allow get: if isValidId(inviteId) && isSignedIn() && (isManagerOrAdmin() || resource.data.email == authEmailLower());
+      allow list: if isSignedIn() && (isManagerOrAdmin() || resource.data.email == authEmailLower());
       allow create: if isValidId(inviteId) && isManagerOrAdmin() && isValidStaffInvite(incoming())
         && incoming().createdBy == request.auth.uid
         && incoming().createdAt == request.time;
@@ -428,7 +434,7 @@ service cloud.firestore {
 
     match /patients/{patientId} {
       allow get: if isValidId(patientId) && isActiveStaff();
-      allow list: if isActiveStaff() && resource.data.createdBy != '';
+      allow list: if isActiveStaff();
       allow create: if isValidId(patientId) && isActiveStaff() && isValidPatient(incoming())
         && incoming().createdBy == request.auth.uid
         && incoming().createdAt == request.time
@@ -446,7 +452,7 @@ service cloud.firestore {
 
     match /tests/{testId} {
       allow get: if isValidId(testId) && isActiveStaff();
-      allow list: if isActiveStaff() && resource.data.code != '';
+      allow list: if isActiveStaff();
       allow create: if isValidId(testId) && isManagerOrAdmin() && isValidLabTest(incoming())
         && incoming().createdBy == request.auth.uid
         && incoming().createdAt == request.time
@@ -460,7 +466,7 @@ service cloud.firestore {
 
     match /bookings/{bookingId} {
       allow get: if isValidId(bookingId) && isActiveStaff();
-      allow list: if isActiveStaff() && resource.data.patientId != '';
+      allow list: if isActiveStaff();
       allow create: if isValidId(bookingId) && isFrontDeskOrHigher() && isValidBooking(incoming())
         && exists(/databases/$(database)/documents/patients/$(incoming().patientId))
         && incoming().createdBy == request.auth.uid
@@ -481,7 +487,7 @@ service cloud.firestore {
 
     match /samples/{sampleId} {
       allow get: if isValidId(sampleId) && isActiveStaff();
-      allow list: if isActiveStaff() && resource.data.bookingId != '';
+      allow list: if isActiveStaff();
       allow create: if isValidId(sampleId) && isActiveStaff() && isValidSample(incoming())
         && exists(/databases/$(database)/documents/bookings/$(incoming().bookingId))
         && incoming().createdBy == request.auth.uid
@@ -501,7 +507,7 @@ service cloud.firestore {
 
     match /labReports/{reportId} {
       allow get: if isValidId(reportId) && isActiveStaff();
-      allow list: if isActiveStaff() && resource.data.bookingId != '';
+      allow list: if isActiveStaff();
       allow create: if isValidId(reportId) && isActiveStaff() && isValidLabReport(incoming())
         && exists(/databases/$(database)/documents/bookings/$(incoming().bookingId))
         && incoming().createdBy == request.auth.uid
@@ -529,7 +535,7 @@ service cloud.firestore {
 
     match /payments/{paymentId} {
       allow get: if isValidId(paymentId) && isActiveStaff();
-      allow list: if isActiveStaff() && resource.data.bookingId != '';
+      allow list: if isActiveStaff();
       allow create: if isValidId(paymentId) && isFrontDeskOrHigher() && isValidPayment(incoming())
         && exists(/databases/$(database)/documents/bookings/$(incoming().bookingId))
         && incoming().receivedBy == request.auth.uid
@@ -540,7 +546,7 @@ service cloud.firestore {
 
     match /cashbook/{entryId} {
       allow get: if isValidId(entryId) && isActiveStaff();
-      allow list: if isActiveStaff() && resource.data.recordedBy != '';
+      allow list: if isActiveStaff();
       allow create: if isValidId(entryId) && isFrontDeskOrHigher() && isValidCashbookEntry(incoming())
         && incoming().recordedBy == request.auth.uid
         && incoming().createdAt == request.time;
@@ -552,7 +558,7 @@ service cloud.firestore {
 
     match /homeCollections/{collectionId} {
       allow get: if isValidId(collectionId) && isActiveStaff();
-      allow list: if isActiveStaff() && resource.data.createdBy != '';
+      allow list: if isActiveStaff();
       allow create: if isValidId(collectionId) && isActiveStaff() && isValidHomeCollection(incoming())
         && incoming().createdBy == request.auth.uid
         && incoming().createdAt == request.time
@@ -570,7 +576,7 @@ service cloud.firestore {
 
     match /doctors/{doctorId} {
       allow get: if isValidId(doctorId) && isActiveStaff();
-      allow list: if isActiveStaff() && resource.data.name != '';
+      allow list: if isActiveStaff();
       allow create: if isValidId(doctorId) && isFrontDeskOrHigher() && isValidDoctor(incoming())
         && incoming().createdBy == request.auth.uid
         && incoming().createdAt == request.time
@@ -584,7 +590,7 @@ service cloud.firestore {
 
     match /attendance/{attendanceId} {
       allow get: if isValidId(attendanceId) && isActiveStaff();
-      allow list: if isActiveStaff() && resource.data.staffId != '';
+      allow list: if isActiveStaff();
       allow create: if isValidId(attendanceId) && isActiveStaff() && isValidAttendance(incoming())
         && (isManagerOrAdmin() || incoming().staffId == request.auth.uid)
         && incoming().createdBy == request.auth.uid
@@ -599,7 +605,7 @@ service cloud.firestore {
 
     match /notifications/{notificationId} {
       allow get: if isValidId(notificationId) && isActiveStaff();
-      allow list: if isActiveStaff() && resource.data.sentBy != '';
+      allow list: if isActiveStaff();
       allow create: if isValidId(notificationId) && isActiveStaff() && isValidNotificationLog(incoming())
         && incoming().sentBy == request.auth.uid
         && incoming().createdAt == request.time;
@@ -609,7 +615,7 @@ service cloud.firestore {
 
     match /auditLogs/{logId} {
       allow get: if isValidId(logId) && isManagerOrAdmin();
-      allow list: if isManagerOrAdmin() && resource.data.actorUid != '';
+      allow list: if isManagerOrAdmin();
       allow create: if isValidId(logId) && isActiveStaff() && isValidAuditLog(incoming())
         && incoming().actorUid == request.auth.uid
         && incoming().createdAt == request.time;
@@ -619,7 +625,7 @@ service cloud.firestore {
 
     match /settings/{settingId} {
       allow get: if isValidId(settingId) && isActiveStaff();
-      allow list: if isActiveStaff() && resource.data.labName != '';
+      allow list: if isActiveStaff();
       allow create, update: if isValidId(settingId) && isAdmin() && isValidLabSettings(incoming())
         && incoming().updatedBy == request.auth.uid
         && incoming().updatedAt == request.time;

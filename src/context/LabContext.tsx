@@ -1073,16 +1073,33 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     async (data: Omit<Attendance, 'id' | 'createdBy' | 'updatedAt'>) => {
       if (!authUser) throw new Error('Not authenticated');
       const docId = `${data.staffId}_${data.date}`;
+      const docRef = doc(db, 'attendance', docId);
       try {
-        await setDoc(
-          doc(db, 'attendance', docId),
-          stripUndefined({
-            ...data,
-            createdBy: authUser.uid,
-            updatedAt: serverTimestamp(),
-          }),
-          { merge: true }
-        );
+        const existingSnap = await getDoc(docRef);
+        if (existingSnap.exists()) {
+          await updateDoc(
+            docRef,
+            stripUndefined({
+              staffName: data.staffName,
+              role: data.role,
+              date: data.date,
+              checkInTime: data.checkInTime,
+              checkOutTime: data.checkOutTime,
+              status: data.status,
+              notes: data.notes,
+              updatedAt: serverTimestamp(),
+            })
+          );
+        } else {
+          await setDoc(
+            docRef,
+            stripUndefined({
+              ...data,
+              createdBy: authUser.uid,
+              updatedAt: serverTimestamp(),
+            })
+          );
+        }
         await logAudit('MARK_ATTENDANCE', 'Staff', `Attendance for ${data.staffName} (${data.date}): ${data.status}`, docId);
         pushToast('success', `Attendance saved for ${data.staffName}.`);
       } catch (err) {
@@ -1180,18 +1197,36 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [authUser, logAudit]
   );
 
+  const sanitizeSettingsPayload = (merged: LabSettings, uid: string) =>
+    stripUndefined({
+      labName: merged.labName,
+      tagline: merged.tagline,
+      address: merged.address,
+      phone: merged.phone,
+      email: merged.email,
+      website: merged.website,
+      regNumber: merged.regNumber,
+      gstNumber: merged.gstNumber,
+      authorizedSignatoryName: merged.authorizedSignatoryName,
+      authorizedSignatoryTitle: merged.authorizedSignatoryTitle,
+      reportHeaderColor: merged.reportHeaderColor,
+      reportFooterNote: merged.reportFooterNote,
+      showBarcodeOnReport: merged.showBarcodeOnReport,
+      showQrOnReport: merged.showQrOnReport,
+      logoDataUrl: merged.logoDataUrl,
+      signatureDataUrl: merged.signatureDataUrl,
+      lastBackupAt: merged.lastBackupAt,
+      updatedBy: uid,
+      updatedAt: serverTimestamp(),
+    });
+
   const saveSettings = useCallback(
     async (updates: Partial<LabSettings>) => {
       if (!authUser) throw new Error('Not authenticated');
       try {
         await setDoc(
           doc(db, 'settings', 'labProfile'),
-          stripUndefined({
-            ...settings,
-            ...updates,
-            updatedBy: authUser.uid,
-            updatedAt: serverTimestamp(),
-          })
+          sanitizeSettingsPayload({ ...settings, ...updates }, authUser.uid)
         );
         await logAudit('UPDATE_SETTINGS', 'Settings', 'Updated laboratory configuration / template', 'labProfile');
         pushToast('success', 'Laboratory settings saved.');
@@ -1211,28 +1246,35 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         settings?: LabSettings;
       };
 
+      const existingTestIds = new Set(tests.map((item) => item.id));
+      const existingDoctorIds = new Set(doctors.map((item) => item.id));
+
       const batch = writeBatch(db);
       let count = 0;
 
       if (Array.isArray(parsed.tests)) {
         for (const t of parsed.tests.slice(0, 100)) {
           if (!t.id || !t.code || !t.name) continue;
-          batch.set(
-            doc(db, 'tests', t.id),
-            stripUndefined({
-              code: t.code,
-              name: t.name,
-              department: t.department || 'General',
-              sampleType: t.sampleType || 'Serum',
-              price: Number(t.price) || 0,
-              turnaroundHours: t.turnaroundHours ?? 6,
-              parameters: Array.isArray(t.parameters) ? t.parameters : [],
-              isActive: t.isActive !== false,
+          const testFields = stripUndefined({
+            code: t.code,
+            name: t.name,
+            department: t.department || 'General',
+            sampleType: t.sampleType || 'Serum',
+            price: Number(t.price) || 0,
+            turnaroundHours: t.turnaroundHours ?? 6,
+            parameters: Array.isArray(t.parameters) ? t.parameters : [],
+            isActive: t.isActive !== false,
+            updatedAt: serverTimestamp(),
+          });
+          if (existingTestIds.has(t.id)) {
+            batch.update(doc(db, 'tests', t.id), testFields);
+          } else {
+            batch.set(doc(db, 'tests', t.id), {
+              ...testFields,
               createdBy: authUser.uid,
               createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-            })
-          );
+            });
+          }
           count++;
         }
       }
@@ -1240,22 +1282,26 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (Array.isArray(parsed.doctors)) {
         for (const d of parsed.doctors.slice(0, 100)) {
           if (!d.id || !d.name) continue;
-          batch.set(
-            doc(db, 'doctors', d.id),
-            stripUndefined({
-              name: d.name,
-              qualification: d.qualification,
-              specialization: d.specialization,
-              clinicName: d.clinicName,
-              mobile: d.mobile,
-              email: d.email,
-              commissionPercent: d.commissionPercent,
-              isActive: d.isActive !== false,
+          const doctorFields = stripUndefined({
+            name: d.name,
+            qualification: d.qualification,
+            specialization: d.specialization,
+            clinicName: d.clinicName,
+            mobile: d.mobile,
+            email: d.email,
+            commissionPercent: d.commissionPercent,
+            isActive: d.isActive !== false,
+            updatedAt: serverTimestamp(),
+          });
+          if (existingDoctorIds.has(d.id)) {
+            batch.update(doc(db, 'doctors', d.id), doctorFields);
+          } else {
+            batch.set(doc(db, 'doctors', d.id), {
+              ...doctorFields,
               createdBy: authUser.uid,
               createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-            })
-          );
+            });
+          }
           count++;
         }
       }
@@ -1263,20 +1309,20 @@ export const LabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (parsed.settings && parsed.settings.labName) {
         batch.set(
           doc(db, 'settings', 'labProfile'),
-          stripUndefined({
-            ...parsed.settings,
-            updatedBy: authUser.uid,
-            updatedAt: serverTimestamp(),
-          })
+          sanitizeSettingsPayload({ ...DEFAULT_SETTINGS, ...parsed.settings }, authUser.uid)
         );
         count++;
       }
 
-      await batch.commit();
-      await logAudit('RESTORE_BACKUP', 'Settings', `Restored ${count} configuration records from JSON backup`, 'labProfile');
-      pushToast('success', `Restored ${count} records from backup.`);
+      try {
+        await batch.commit();
+        await logAudit('RESTORE_BACKUP', 'Settings', `Restored ${count} configuration records from JSON backup`, 'labProfile');
+        pushToast('success', `Restored ${count} records from backup.`);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, 'settings/labProfile');
+      }
     },
-    [authUser, logAudit, pushToast]
+    [authUser, tests, doctors, logAudit, pushToast]
   );
 
   const value: LabContextValue = {
