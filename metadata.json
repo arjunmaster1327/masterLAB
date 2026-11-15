@@ -1,0 +1,6 @@
+{
+  "name": "MASTER COMPUTERIZED LABORATORY",
+  "description": "Complete clinical diagnostic laboratory management system with patient registration, test booking, barcode sample tracking, validated lab reports, PDF/WhatsApp sharing, billing, accounts, and real-time offline cloud sync.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

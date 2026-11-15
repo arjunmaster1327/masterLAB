@@ -1,0 +1,629 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Safety Net (Default-Deny Catch-All)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Hardened Global Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isBootstrapAdmin() {
+      return isSignedIn() && request.auth.token.email == 'arjunmaster1327@gmail.com';
+    }
+
+    function userDocExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isActiveStaff() {
+      return isBootstrapAdmin() || (
+        isSignedIn() &&
+        userDocExists() &&
+        userDoc().status == 'active'
+      );
+    }
+
+    function hasRole(allowedRoles) {
+      return isBootstrapAdmin() || (
+        isActiveStaff() &&
+        userDoc().role in allowedRoles
+      );
+    }
+
+    function isAdmin() {
+      return hasRole(['admin']);
+    }
+
+    function isManagerOrAdmin() {
+      return hasRole(['admin', 'manager']);
+    }
+
+    function isFrontDeskOrHigher() {
+      return hasRole(['admin', 'manager', 'receptionist']);
+    }
+
+    function isLabTechOrHigher() {
+      return hasRole(['admin', 'manager', 'technician']);
+    }
+
+    // 3. Entity Validation Blueprints (Anti-Update-Gap)
+
+    function isValidUserAccount(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'role', 'status', 'permissions', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'role', 'department', 'status', 'permissions', 'inviteId', 'avatarUrl', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+        && data.role in ['admin', 'manager', 'receptionist', 'technician', 'staff']
+        && (!('department' in data) || (data.department is string && data.department.size() <= 80))
+        && data.status in ['active', 'inactive']
+        && data.permissions is list && data.permissions.size() <= 20
+        && (data.permissions.size() == 0 || data.permissions[0] is string)
+        && (!('inviteId' in data) || isValidId(data.inviteId))
+        && (!('avatarUrl' in data) || (data.avatarUrl is string && data.avatarUrl.size() <= 500))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserPrivate(data) {
+      return data.keys().hasAll(['uid', 'email', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'phone', 'address', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 160
+        && (!('phone' in data) || (data.phone is string && data.phone.size() <= 30))
+        && (!('address' in data) || (data.address is string && data.address.size() <= 300))
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStaffInvite(data) {
+      return data.keys().hasAll(['email', 'displayName', 'role', 'permissions', 'createdBy', 'createdAt'])
+        && data.keys().hasOnly(['email', 'displayName', 'role', 'department', 'permissions', 'createdBy', 'createdAt'])
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 160
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+        && data.role in ['admin', 'manager', 'receptionist', 'technician', 'staff']
+        && (!('department' in data) || (data.department is string && data.department.size() <= 80))
+        && data.permissions is list && data.permissions.size() <= 20
+        && (data.permissions.size() == 0 || data.permissions[0] is string)
+        && isValidId(data.createdBy)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidPatient(data) {
+      return data.keys().hasAll(['patientCode', 'name', 'age', 'ageUnit', 'gender', 'mobile', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['patientCode', 'name', 'age', 'ageUnit', 'gender', 'mobile', 'address', 'bloodGroup', 'referringDoctorId', 'referringDoctorName', 'notes', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.patientCode is string && data.patientCode.size() >= 3 && data.patientCode.size() <= 40
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
+        && data.age is number && data.age >= 0 && data.age <= 150
+        && data.ageUnit in ['Years', 'Months', 'Days']
+        && data.gender in ['Male', 'Female', 'Other']
+        && data.mobile is string && data.mobile.size() >= 5 && data.mobile.size() <= 24
+        && (!('address' in data) || (data.address is string && data.address.size() <= 300))
+        && (!('bloodGroup' in data) || (data.bloodGroup is string && data.bloodGroup.size() <= 12))
+        && (!('referringDoctorId' in data) || (data.referringDoctorId is string && data.referringDoctorId.size() <= 128))
+        && (!('referringDoctorName' in data) || (data.referringDoctorName is string && data.referringDoctorName.size() <= 120))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 500))
+        && isValidId(data.createdBy)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidLabTest(data) {
+      return data.keys().hasAll(['code', 'name', 'department', 'sampleType', 'price', 'parameters', 'isActive', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['code', 'name', 'department', 'sampleType', 'price', 'turnaroundHours', 'parameters', 'isActive', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.code is string && data.code.size() >= 1 && data.code.size() <= 32
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 140
+        && data.department is string && data.department.size() >= 1 && data.department.size() <= 60
+        && data.sampleType is string && data.sampleType.size() >= 1 && data.sampleType.size() <= 60
+        && data.price is number && data.price >= 0 && data.price <= 1000000
+        && (!('turnaroundHours' in data) || (data.turnaroundHours is number && data.turnaroundHours >= 0 && data.turnaroundHours <= 720))
+        && data.parameters is list && data.parameters.size() <= 45
+        && (data.parameters.size() == 0 || data.parameters[0] is map)
+        && data.isActive is bool
+        && isValidId(data.createdBy)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidBooking(data) {
+      return data.keys().hasAll(['accessionNo', 'barcodeValue', 'patientId', 'patientName', 'testItems', 'subtotal', 'discount', 'netAmount', 'paidAmount', 'dueAmount', 'paymentStatus', 'sampleStatus', 'reportStatus', 'collectionType', 'bookingDate', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['accessionNo', 'barcodeValue', 'patientId', 'patientCode', 'patientName', 'patientAge', 'patientGender', 'patientMobile', 'doctorId', 'doctorName', 'testItems', 'subtotal', 'discount', 'discountReason', 'netAmount', 'paidAmount', 'dueAmount', 'paymentStatus', 'sampleStatus', 'reportStatus', 'collectionType', 'bookingDate', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.accessionNo is string && data.accessionNo.size() >= 3 && data.accessionNo.size() <= 40
+        && data.barcodeValue is string && data.barcodeValue.size() >= 3 && data.barcodeValue.size() <= 60
+        && isValidId(data.patientId)
+        && (!('patientCode' in data) || (data.patientCode is string && data.patientCode.size() <= 40))
+        && data.patientName is string && data.patientName.size() >= 1 && data.patientName.size() <= 120
+        && (!('patientAge' in data) || (data.patientAge is string && data.patientAge.size() <= 30))
+        && (!('patientGender' in data) || (data.patientGender is string && data.patientGender.size() <= 16))
+        && (!('patientMobile' in data) || (data.patientMobile is string && data.patientMobile.size() <= 24))
+        && (!('doctorId' in data) || (data.doctorId is string && data.doctorId.size() <= 128))
+        && (!('doctorName' in data) || (data.doctorName is string && data.doctorName.size() <= 120))
+        && data.testItems is list && data.testItems.size() >= 1 && data.testItems.size() <= 30
+        && data.testItems[0] is map
+        && data.subtotal is number && data.subtotal >= 0
+        && data.discount is number && data.discount >= 0
+        && (!('discountReason' in data) || (data.discountReason is string && data.discountReason.size() <= 160))
+        && data.netAmount is number && data.netAmount >= 0
+        && data.paidAmount is number && data.paidAmount >= 0
+        && data.dueAmount is number && data.dueAmount >= 0
+        && data.paymentStatus in ['unpaid', 'partial', 'paid']
+        && data.sampleStatus in ['pending_collection', 'collected', 'received', 'processing', 'completed']
+        && data.reportStatus in ['pending', 'entered', 'verified', 'approved']
+        && data.collectionType in ['walk_in', 'home_collection']
+        && data.bookingDate is string && data.bookingDate.size() >= 8 && data.bookingDate.size() <= 20
+        && isValidId(data.createdBy)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSample(data) {
+      return data.keys().hasAll(['bookingId', 'accessionNo', 'barcodeValue', 'patientId', 'patientName', 'sampleType', 'status', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['bookingId', 'accessionNo', 'barcodeValue', 'patientId', 'patientName', 'sampleType', 'tubeColor', 'status', 'collectedBy', 'collectedAt', 'receivedBy', 'receivedAt', 'rejectionReason', 'notes', 'createdBy', 'createdAt', 'updatedAt'])
+        && isValidId(data.bookingId)
+        && data.accessionNo is string && data.accessionNo.size() >= 3 && data.accessionNo.size() <= 40
+        && data.barcodeValue is string && data.barcodeValue.size() >= 3 && data.barcodeValue.size() <= 60
+        && isValidId(data.patientId)
+        && data.patientName is string && data.patientName.size() >= 1 && data.patientName.size() <= 120
+        && data.sampleType is string && data.sampleType.size() >= 1 && data.sampleType.size() <= 60
+        && (!('tubeColor' in data) || (data.tubeColor is string && data.tubeColor.size() <= 40))
+        && data.status in ['pending_collection', 'collected', 'received', 'processing', 'completed', 'rejected']
+        && (!('collectedBy' in data) || (data.collectedBy is string && data.collectedBy.size() <= 120))
+        && (!('collectedAt' in data) || (data.collectedAt is string && data.collectedAt.size() <= 40))
+        && (!('receivedBy' in data) || (data.receivedBy is string && data.receivedBy.size() <= 120))
+        && (!('receivedAt' in data) || (data.receivedAt is string && data.receivedAt.size() <= 40))
+        && (!('rejectionReason' in data) || (data.rejectionReason is string && data.rejectionReason.size() <= 300))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 300))
+        && isValidId(data.createdBy)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidLabReport(data) {
+      return data.keys().hasAll(['bookingId', 'accessionNo', 'patientId', 'patientName', 'results', 'status', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['bookingId', 'accessionNo', 'patientId', 'patientCode', 'patientName', 'patientAge', 'patientGender', 'doctorName', 'results', 'status', 'clinicalNotes', 'enteredBy', 'enteredByName', 'verifiedBy', 'verifiedByName', 'approvedBy', 'approvedByName', 'approvedAt', 'createdBy', 'createdAt', 'updatedAt'])
+        && isValidId(data.bookingId)
+        && data.accessionNo is string && data.accessionNo.size() >= 3 && data.accessionNo.size() <= 40
+        && isValidId(data.patientId)
+        && (!('patientCode' in data) || (data.patientCode is string && data.patientCode.size() <= 40))
+        && data.patientName is string && data.patientName.size() >= 1 && data.patientName.size() <= 120
+        && (!('patientAge' in data) || (data.patientAge is string && data.patientAge.size() <= 30))
+        && (!('patientGender' in data) || (data.patientGender is string && data.patientGender.size() <= 16))
+        && (!('doctorName' in data) || (data.doctorName is string && data.doctorName.size() <= 120))
+        && data.results is list && data.results.size() <= 30
+        && (data.results.size() == 0 || data.results[0] is map)
+        && data.status in ['pending', 'entered', 'verified', 'approved']
+        && (!('clinicalNotes' in data) || (data.clinicalNotes is string && data.clinicalNotes.size() <= 1000))
+        && (!('enteredBy' in data) || (data.enteredBy is string && data.enteredBy.size() <= 128))
+        && (!('enteredByName' in data) || (data.enteredByName is string && data.enteredByName.size() <= 120))
+        && (!('verifiedBy' in data) || (data.verifiedBy is string && data.verifiedBy.size() <= 128))
+        && (!('verifiedByName' in data) || (data.verifiedByName is string && data.verifiedByName.size() <= 120))
+        && (!('approvedBy' in data) || (data.approvedBy is string && data.approvedBy.size() <= 128))
+        && (!('approvedByName' in data) || (data.approvedByName is string && data.approvedByName.size() <= 120))
+        && (!('approvedAt' in data) || (data.approvedAt is string && data.approvedAt.size() <= 40))
+        && isValidId(data.createdBy)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPayment(data) {
+      return data.keys().hasAll(['receiptNo', 'bookingId', 'accessionNo', 'patientId', 'patientName', 'amount', 'method', 'paymentDate', 'receivedBy', 'createdAt'])
+        && data.keys().hasOnly(['receiptNo', 'bookingId', 'accessionNo', 'patientId', 'patientName', 'amount', 'method', 'referenceNo', 'notes', 'paymentDate', 'receivedBy', 'receivedByName', 'createdAt'])
+        && data.receiptNo is string && data.receiptNo.size() >= 3 && data.receiptNo.size() <= 40
+        && isValidId(data.bookingId)
+        && data.accessionNo is string && data.accessionNo.size() >= 3 && data.accessionNo.size() <= 40
+        && isValidId(data.patientId)
+        && data.patientName is string && data.patientName.size() >= 1 && data.patientName.size() <= 120
+        && data.amount is number && data.amount > 0 && data.amount <= 10000000
+        && data.method in ['cash', 'upi', 'card', 'bank']
+        && (!('referenceNo' in data) || (data.referenceNo is string && data.referenceNo.size() <= 80))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 300))
+        && data.paymentDate is string && data.paymentDate.size() >= 8 && data.paymentDate.size() <= 20
+        && isValidId(data.receivedBy)
+        && (!('receivedByName' in data) || (data.receivedByName is string && data.receivedByName.size() <= 120))
+        && data.createdAt is timestamp;
+    }
+
+    function isValidCashbookEntry(data) {
+      return data.keys().hasAll(['entryDate', 'type', 'category', 'description', 'amount', 'paymentMethod', 'recordedBy', 'createdAt'])
+        && data.keys().hasOnly(['entryDate', 'type', 'category', 'description', 'amount', 'paymentMethod', 'referenceId', 'recordedBy', 'recordedByName', 'createdAt'])
+        && data.entryDate is string && data.entryDate.size() >= 8 && data.entryDate.size() <= 20
+        && data.type in ['income', 'expense']
+        && data.category is string && data.category.size() >= 1 && data.category.size() <= 80
+        && data.description is string && data.description.size() >= 1 && data.description.size() <= 300
+        && data.amount is number && data.amount > 0 && data.amount <= 100000000
+        && data.paymentMethod in ['cash', 'upi', 'card', 'bank']
+        && (!('referenceId' in data) || (data.referenceId is string && data.referenceId.size() <= 128))
+        && isValidId(data.recordedBy)
+        && (!('recordedByName' in data) || (data.recordedByName is string && data.recordedByName.size() <= 120))
+        && data.createdAt is timestamp;
+    }
+
+    function isValidHomeCollection(data) {
+      return data.keys().hasAll(['patientName', 'patientMobile', 'address', 'scheduledDate', 'scheduledSlot', 'status', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['patientId', 'patientName', 'patientMobile', 'address', 'landmark', 'scheduledDate', 'scheduledSlot', 'requestedTests', 'assignedStaffId', 'assignedStaffName', 'status', 'bookingId', 'notes', 'createdBy', 'createdAt', 'updatedAt'])
+        && (!('patientId' in data) || (data.patientId is string && data.patientId.size() <= 128))
+        && data.patientName is string && data.patientName.size() >= 1 && data.patientName.size() <= 120
+        && data.patientMobile is string && data.patientMobile.size() >= 5 && data.patientMobile.size() <= 24
+        && data.address is string && data.address.size() >= 3 && data.address.size() <= 300
+        && (!('landmark' in data) || (data.landmark is string && data.landmark.size() <= 160))
+        && data.scheduledDate is string && data.scheduledDate.size() >= 8 && data.scheduledDate.size() <= 20
+        && data.scheduledSlot is string && data.scheduledSlot.size() >= 1 && data.scheduledSlot.size() <= 40
+        && (!('requestedTests' in data) || (data.requestedTests is list && data.requestedTests.size() <= 30 && (data.requestedTests.size() == 0 || data.requestedTests[0] is string)))
+        && (!('assignedStaffId' in data) || (data.assignedStaffId is string && data.assignedStaffId.size() <= 128))
+        && (!('assignedStaffName' in data) || (data.assignedStaffName is string && data.assignedStaffName.size() <= 120))
+        && data.status in ['scheduled', 'en_route', 'collected', 'delivered_to_lab', 'cancelled']
+        && (!('bookingId' in data) || (data.bookingId is string && data.bookingId.size() <= 128))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 400))
+        && isValidId(data.createdBy)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidDoctor(data) {
+      return data.keys().hasAll(['name', 'isActive', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['name', 'qualification', 'specialization', 'clinicName', 'mobile', 'email', 'commissionPercent', 'isActive', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
+        && (!('qualification' in data) || (data.qualification is string && data.qualification.size() <= 120))
+        && (!('specialization' in data) || (data.specialization is string && data.specialization.size() <= 120))
+        && (!('clinicName' in data) || (data.clinicName is string && data.clinicName.size() <= 160))
+        && (!('mobile' in data) || (data.mobile is string && data.mobile.size() <= 24))
+        && (!('email' in data) || (data.email is string && data.email.size() <= 160))
+        && (!('commissionPercent' in data) || (data.commissionPercent is number && data.commissionPercent >= 0 && data.commissionPercent <= 100))
+        && data.isActive is bool
+        && isValidId(data.createdBy)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAttendance(data) {
+      return data.keys().hasAll(['staffId', 'staffName', 'date', 'status', 'createdBy', 'updatedAt'])
+        && data.keys().hasOnly(['staffId', 'staffName', 'role', 'date', 'checkInTime', 'checkOutTime', 'status', 'notes', 'createdBy', 'updatedAt'])
+        && isValidId(data.staffId)
+        && data.staffName is string && data.staffName.size() >= 1 && data.staffName.size() <= 120
+        && (!('role' in data) || (data.role is string && data.role.size() <= 40))
+        && data.date is string && data.date.size() >= 8 && data.date.size() <= 20
+        && (!('checkInTime' in data) || (data.checkInTime is string && data.checkInTime.size() <= 40))
+        && (!('checkOutTime' in data) || (data.checkOutTime is string && data.checkOutTime.size() <= 40))
+        && data.status in ['present', 'half_day', 'absent', 'on_leave']
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 300))
+        && isValidId(data.createdBy)
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidNotificationLog(data) {
+      return data.keys().hasAll(['patientName', 'mobile', 'channel', 'eventType', 'message', 'status', 'sentBy', 'createdAt'])
+        && data.keys().hasOnly(['patientId', 'patientName', 'mobile', 'channel', 'eventType', 'message', 'status', 'referenceId', 'sentBy', 'createdAt'])
+        && (!('patientId' in data) || (data.patientId is string && data.patientId.size() <= 128))
+        && data.patientName is string && data.patientName.size() >= 1 && data.patientName.size() <= 120
+        && data.mobile is string && data.mobile.size() >= 5 && data.mobile.size() <= 24
+        && data.channel in ['whatsapp', 'sms']
+        && data.eventType in ['booking', 'payment', 'report_ready', 'home_collection']
+        && data.message is string && data.message.size() >= 1 && data.message.size() <= 1000
+        && data.status in ['queued', 'dispatched']
+        && (!('referenceId' in data) || (data.referenceId is string && data.referenceId.size() <= 128))
+        && isValidId(data.sentBy)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['actorUid', 'actorName', 'actorRole', 'action', 'module', 'summary', 'createdAt'])
+        && data.keys().hasOnly(['actorUid', 'actorName', 'actorRole', 'action', 'module', 'targetId', 'summary', 'createdAt'])
+        && isValidId(data.actorUid)
+        && data.actorName is string && data.actorName.size() >= 1 && data.actorName.size() <= 120
+        && data.actorRole is string && data.actorRole.size() >= 1 && data.actorRole.size() <= 40
+        && data.action is string && data.action.size() >= 1 && data.action.size() <= 80
+        && data.module is string && data.module.size() >= 1 && data.module.size() <= 60
+        && (!('targetId' in data) || (data.targetId is string && data.targetId.size() <= 128))
+        && data.summary is string && data.summary.size() >= 1 && data.summary.size() <= 400
+        && data.createdAt is timestamp;
+    }
+
+    function isValidLabSettings(data) {
+      return data.keys().hasAll(['labName', 'updatedBy', 'updatedAt'])
+        && data.keys().hasOnly(['labName', 'tagline', 'address', 'phone', 'email', 'website', 'regNumber', 'gstNumber', 'authorizedSignatoryName', 'authorizedSignatoryTitle', 'reportHeaderColor', 'reportFooterNote', 'showBarcodeOnReport', 'showQrOnReport', 'logoDataUrl', 'signatureDataUrl', 'lastBackupAt', 'updatedBy', 'updatedAt'])
+        && data.labName is string && data.labName.size() >= 1 && data.labName.size() <= 160
+        && (!('tagline' in data) || (data.tagline is string && data.tagline.size() <= 200))
+        && (!('address' in data) || (data.address is string && data.address.size() <= 300))
+        && (!('phone' in data) || (data.phone is string && data.phone.size() <= 60))
+        && (!('email' in data) || (data.email is string && data.email.size() <= 160))
+        && (!('website' in data) || (data.website is string && data.website.size() <= 160))
+        && (!('regNumber' in data) || (data.regNumber is string && data.regNumber.size() <= 80))
+        && (!('gstNumber' in data) || (data.gstNumber is string && data.gstNumber.size() <= 60))
+        && (!('authorizedSignatoryName' in data) || (data.authorizedSignatoryName is string && data.authorizedSignatoryName.size() <= 120))
+        && (!('authorizedSignatoryTitle' in data) || (data.authorizedSignatoryTitle is string && data.authorizedSignatoryTitle.size() <= 120))
+        && (!('reportHeaderColor' in data) || (data.reportHeaderColor is string && data.reportHeaderColor.size() <= 20))
+        && (!('reportFooterNote' in data) || (data.reportFooterNote is string && data.reportFooterNote.size() <= 400))
+        && (!('showBarcodeOnReport' in data) || data.showBarcodeOnReport is bool)
+        && (!('showQrOnReport' in data) || data.showQrOnReport is bool)
+        && (!('logoDataUrl' in data) || (data.logoDataUrl is string && data.logoDataUrl.size() <= 150000))
+        && (!('signatureDataUrl' in data) || (data.signatureDataUrl is string && data.signatureDataUrl.size() <= 150000))
+        && (!('lastBackupAt' in data) || (data.lastBackupAt is string && data.lastBackupAt.size() <= 40))
+        && isValidId(data.updatedBy)
+        && data.updatedAt is timestamp;
+    }
+
+    // 4. Collection Rules
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isActiveStaff());
+      allow list: if isActiveStaff() && resource.data.uid != '';
+      allow create: if isValidId(userId) && isSignedIn() && isValidUserAccount(incoming())
+        && incoming().uid == userId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (isOwner(userId) && isBootstrapAdmin() && incoming().role == 'admin' && incoming().status == 'active')
+          || (
+            isOwner(userId)
+            && 'inviteId' in incoming()
+            && exists(/databases/$(database)/documents/staffInvites/$(incoming().inviteId))
+            && get(/databases/$(database)/documents/staffInvites/$(incoming().inviteId)).data.email == request.auth.token.email
+            && get(/databases/$(database)/documents/staffInvites/$(incoming().inviteId)).data.role == incoming().role
+            && incoming().status == 'active'
+          )
+          || (isOwner(userId) && incoming().role == 'staff' && incoming().status == 'inactive')
+        );
+      allow update: if isValidId(userId) && isSignedIn() && isValidUserAccount(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (
+            isOwner(userId)
+            && incoming().role == existing().role
+            && incoming().status == existing().status
+            && incoming().permissions == existing().permissions
+            && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'department', 'avatarUrl', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(userId) && isAdmin() && userId != request.auth.uid;
+
+      match /private/{docId} {
+        allow get: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin());
+        allow list: if isValidId(userId) && (isOwner(userId) || isAdmin()) && resource.data.uid == userId;
+        allow create, update: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin())
+          && isValidUserPrivate(incoming())
+          && incoming().uid == userId
+          && incoming().updatedAt == request.time;
+        allow delete: if isValidId(userId) && isValidId(docId) && isAdmin();
+      }
+    }
+
+    match /staffInvites/{inviteId} {
+      allow get: if isValidId(inviteId) && isSignedIn() && (isManagerOrAdmin() || resource.data.email == request.auth.token.email);
+      allow list: if isSignedIn() && (isManagerOrAdmin() || resource.data.email == request.auth.token.email);
+      allow create: if isValidId(inviteId) && isManagerOrAdmin() && isValidStaffInvite(incoming())
+        && incoming().createdBy == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if isValidId(inviteId) && isManagerOrAdmin() && isValidStaffInvite(incoming())
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdAt == existing().createdAt;
+      allow delete: if isValidId(inviteId) && isManagerOrAdmin();
+    }
+
+    match /patients/{patientId} {
+      allow get: if isValidId(patientId) && isActiveStaff();
+      allow list: if isActiveStaff() && resource.data.createdBy != '';
+      allow create: if isValidId(patientId) && isActiveStaff() && isValidPatient(incoming())
+        && incoming().createdBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(patientId) && isActiveStaff() && isValidPatient(incoming())
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isManagerOrAdmin()
+          || (isFrontDeskOrHigher() && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'age', 'ageUnit', 'gender', 'mobile', 'address', 'bloodGroup', 'referringDoctorId', 'referringDoctorName', 'notes', 'updatedAt']))
+        );
+      allow delete: if isValidId(patientId) && isAdmin();
+    }
+
+    match /tests/{testId} {
+      allow get: if isValidId(testId) && isActiveStaff();
+      allow list: if isActiveStaff() && resource.data.code != '';
+      allow create: if isValidId(testId) && isManagerOrAdmin() && isValidLabTest(incoming())
+        && incoming().createdBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(testId) && isManagerOrAdmin() && isValidLabTest(incoming())
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+      allow delete: if isValidId(testId) && isAdmin();
+    }
+
+    match /bookings/{bookingId} {
+      allow get: if isValidId(bookingId) && isActiveStaff();
+      allow list: if isActiveStaff() && resource.data.patientId != '';
+      allow create: if isValidId(bookingId) && isFrontDeskOrHigher() && isValidBooking(incoming())
+        && exists(/databases/$(database)/documents/patients/$(incoming().patientId))
+        && incoming().createdBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(bookingId) && isActiveStaff() && isValidBooking(incoming())
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (isFrontDeskOrHigher() && incoming().diff(existing()).affectedKeys().hasOnly(['paidAmount', 'dueAmount', 'paymentStatus', 'discount', 'discountReason', 'netAmount', 'updatedAt']))
+          || (isActiveStaff() && incoming().diff(existing()).affectedKeys().hasOnly(['sampleStatus', 'updatedAt']))
+          || (isLabTechOrHigher() && incoming().diff(existing()).affectedKeys().hasOnly(['reportStatus', 'sampleStatus', 'updatedAt']))
+        );
+      allow delete: if isValidId(bookingId) && isAdmin();
+    }
+
+    match /samples/{sampleId} {
+      allow get: if isValidId(sampleId) && isActiveStaff();
+      allow list: if isActiveStaff() && resource.data.bookingId != '';
+      allow create: if isValidId(sampleId) && isActiveStaff() && isValidSample(incoming())
+        && exists(/databases/$(database)/documents/bookings/$(incoming().bookingId))
+        && incoming().createdBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(sampleId) && isActiveStaff() && isValidSample(incoming())
+        && incoming().bookingId == existing().bookingId
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (existing().status != 'completed' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'collectedBy', 'collectedAt', 'receivedBy', 'receivedAt', 'rejectionReason', 'notes', 'updatedAt']))
+        );
+      allow delete: if isValidId(sampleId) && isAdmin();
+    }
+
+    match /labReports/{reportId} {
+      allow get: if isValidId(reportId) && isActiveStaff();
+      allow list: if isActiveStaff() && resource.data.bookingId != '';
+      allow create: if isValidId(reportId) && isActiveStaff() && isValidLabReport(incoming())
+        && exists(/databases/$(database)/documents/bookings/$(incoming().bookingId))
+        && incoming().createdBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(reportId) && isActiveStaff() && isValidLabReport(incoming())
+        && incoming().bookingId == existing().bookingId
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (
+            existing().status != 'approved'
+            && isLabTechOrHigher()
+            && (
+              (incoming().status in ['pending', 'entered'] && incoming().diff(existing()).affectedKeys().hasOnly(['results', 'status', 'clinicalNotes', 'enteredBy', 'enteredByName', 'updatedAt']))
+              || (incoming().status == 'verified' && incoming().diff(existing()).affectedKeys().hasOnly(['results', 'status', 'clinicalNotes', 'verifiedBy', 'verifiedByName', 'updatedAt']))
+              || (isManagerOrAdmin() && incoming().status == 'approved' && incoming().diff(existing()).affectedKeys().hasOnly(['results', 'status', 'clinicalNotes', 'approvedBy', 'approvedByName', 'approvedAt', 'updatedAt']))
+            )
+          )
+        );
+      allow delete: if isValidId(reportId) && isAdmin();
+    }
+
+    match /payments/{paymentId} {
+      allow get: if isValidId(paymentId) && isActiveStaff();
+      allow list: if isActiveStaff() && resource.data.bookingId != '';
+      allow create: if isValidId(paymentId) && isFrontDeskOrHigher() && isValidPayment(incoming())
+        && exists(/databases/$(database)/documents/bookings/$(incoming().bookingId))
+        && incoming().receivedBy == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isValidId(paymentId) && isAdmin();
+    }
+
+    match /cashbook/{entryId} {
+      allow get: if isValidId(entryId) && isActiveStaff();
+      allow list: if isActiveStaff() && resource.data.recordedBy != '';
+      allow create: if isValidId(entryId) && isFrontDeskOrHigher() && isValidCashbookEntry(incoming())
+        && incoming().recordedBy == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if isValidId(entryId) && isManagerOrAdmin() && isValidCashbookEntry(incoming())
+        && incoming().recordedBy == existing().recordedBy
+        && incoming().createdAt == existing().createdAt;
+      allow delete: if isValidId(entryId) && isAdmin();
+    }
+
+    match /homeCollections/{collectionId} {
+      allow get: if isValidId(collectionId) && isActiveStaff();
+      allow list: if isActiveStaff() && resource.data.createdBy != '';
+      allow create: if isValidId(collectionId) && isActiveStaff() && isValidHomeCollection(incoming())
+        && incoming().createdBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(collectionId) && isActiveStaff() && isValidHomeCollection(incoming())
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isManagerOrAdmin()
+          || incoming().diff(existing()).affectedKeys().hasOnly(['assignedStaffId', 'assignedStaffName', 'status', 'bookingId', 'notes', 'scheduledDate', 'scheduledSlot', 'updatedAt'])
+        );
+      allow delete: if isValidId(collectionId) && isManagerOrAdmin();
+    }
+
+    match /doctors/{doctorId} {
+      allow get: if isValidId(doctorId) && isActiveStaff();
+      allow list: if isActiveStaff() && resource.data.name != '';
+      allow create: if isValidId(doctorId) && isFrontDeskOrHigher() && isValidDoctor(incoming())
+        && incoming().createdBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(doctorId) && isFrontDeskOrHigher() && isValidDoctor(incoming())
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+      allow delete: if isValidId(doctorId) && isAdmin();
+    }
+
+    match /attendance/{attendanceId} {
+      allow get: if isValidId(attendanceId) && isActiveStaff();
+      allow list: if isActiveStaff() && resource.data.staffId != '';
+      allow create: if isValidId(attendanceId) && isActiveStaff() && isValidAttendance(incoming())
+        && (isManagerOrAdmin() || incoming().staffId == request.auth.uid)
+        && incoming().createdBy == request.auth.uid
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(attendanceId) && isActiveStaff() && isValidAttendance(incoming())
+        && (isManagerOrAdmin() || existing().staffId == request.auth.uid)
+        && incoming().staffId == existing().staffId
+        && incoming().createdBy == existing().createdBy
+        && incoming().updatedAt == request.time;
+      allow delete: if isValidId(attendanceId) && isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow get: if isValidId(notificationId) && isActiveStaff();
+      allow list: if isActiveStaff() && resource.data.sentBy != '';
+      allow create: if isValidId(notificationId) && isActiveStaff() && isValidNotificationLog(incoming())
+        && incoming().sentBy == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isValidId(notificationId) && isAdmin();
+    }
+
+    match /auditLogs/{logId} {
+      allow get: if isValidId(logId) && isManagerOrAdmin();
+      allow list: if isManagerOrAdmin() && resource.data.actorUid != '';
+      allow create: if isValidId(logId) && isActiveStaff() && isValidAuditLog(incoming())
+        && incoming().actorUid == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /settings/{settingId} {
+      allow get: if isValidId(settingId) && isActiveStaff();
+      allow list: if isActiveStaff() && resource.data.labName != '';
+      allow create, update: if isValidId(settingId) && isAdmin() && isValidLabSettings(incoming())
+        && incoming().updatedBy == request.auth.uid
+        && incoming().updatedAt == request.time;
+      allow delete: if false;
+    }
+  }
+}

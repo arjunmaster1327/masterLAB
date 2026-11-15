@@ -1,0 +1,396 @@
+{
+  "entities": {
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "Operational staff account and role-based access control profile.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "role": { "type": "string", "enum": ["admin", "manager", "receptionist", "technician", "staff"] },
+        "department": { "type": "string", "maxLength": 80 },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "permissions": { "type": "array", "description": "Bounded list of allowed module keys (max 20)." },
+        "inviteId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "role", "status", "permissions", "createdAt", "updatedAt"]
+    },
+    "UserPrivateContact": {
+      "title": "UserPrivateContact",
+      "description": "Isolated PII contact details for a staff user.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "maxLength": 160 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "address": { "type": "string", "maxLength": 300 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "updatedAt"]
+    },
+    "StaffInvite": {
+      "title": "StaffInvite",
+      "description": "Pre-authorized staff email role assignment created by an administrator.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "role": { "type": "string", "enum": ["admin", "manager", "receptionist", "technician", "staff"] },
+        "department": { "type": "string", "maxLength": 80 },
+        "permissions": { "type": "array" },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "displayName", "role", "permissions", "createdBy", "createdAt"]
+    },
+    "Patient": {
+      "title": "Patient",
+      "description": "Clinical laboratory patient demographic and referral record.",
+      "type": "object",
+      "properties": {
+        "patientCode": { "type": "string", "minLength": 3, "maxLength": 40 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "age": { "type": "number" },
+        "ageUnit": { "type": "string", "enum": ["Years", "Months", "Days"] },
+        "gender": { "type": "string", "enum": ["Male", "Female", "Other"] },
+        "mobile": { "type": "string", "minLength": 5, "maxLength": 24 },
+        "address": { "type": "string", "maxLength": 300 },
+        "bloodGroup": { "type": "string", "maxLength": 12 },
+        "referringDoctorId": { "type": "string", "maxLength": 128 },
+        "referringDoctorName": { "type": "string", "maxLength": 120 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["patientCode", "name", "age", "ageUnit", "gender", "mobile", "createdBy", "createdAt", "updatedAt"]
+    },
+    "LabTest": {
+      "title": "LabTest",
+      "description": "Diagnostic laboratory test definition with pricing and configurable parameter reference ranges.",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 140 },
+        "department": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "sampleType": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "price": { "type": "number" },
+        "turnaroundHours": { "type": "number" },
+        "parameters": { "type": "array" },
+        "isActive": { "type": "boolean" },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["code", "name", "department", "sampleType", "price", "parameters", "isActive", "createdBy", "createdAt", "updatedAt"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Patient test booking, accession number, and invoice summary.",
+      "type": "object",
+      "properties": {
+        "accessionNo": { "type": "string", "minLength": 3, "maxLength": 40 },
+        "barcodeValue": { "type": "string", "minLength": 3, "maxLength": 60 },
+        "patientId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "patientCode": { "type": "string", "maxLength": 40 },
+        "patientName": { "type": "string", "maxLength": 120 },
+        "patientAge": { "type": "string", "maxLength": 30 },
+        "patientGender": { "type": "string", "maxLength": 16 },
+        "patientMobile": { "type": "string", "maxLength": 24 },
+        "doctorId": { "type": "string", "maxLength": 128 },
+        "doctorName": { "type": "string", "maxLength": 120 },
+        "testItems": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "discount": { "type": "number" },
+        "netAmount": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "dueAmount": { "type": "number" },
+        "paymentStatus": { "type": "string", "enum": ["unpaid", "partial", "paid"] },
+        "sampleStatus": { "type": "string", "enum": ["pending_collection", "collected", "received", "processing", "completed"] },
+        "reportStatus": { "type": "string", "enum": ["pending", "entered", "verified", "approved"] },
+        "collectionType": { "type": "string", "enum": ["walk_in", "home_collection"] },
+        "bookingDate": { "type": "string", "maxLength": 20 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["accessionNo", "barcodeValue", "patientId", "patientName", "testItems", "subtotal", "discount", "netAmount", "paidAmount", "dueAmount", "paymentStatus", "sampleStatus", "reportStatus", "collectionType", "bookingDate", "createdBy", "createdAt", "updatedAt"]
+    },
+    "Sample": {
+      "title": "Sample",
+      "description": "Specimen collection, barcode, and chain-of-custody tracking record.",
+      "type": "object",
+      "properties": {
+        "bookingId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "accessionNo": { "type": "string", "maxLength": 40 },
+        "barcodeValue": { "type": "string", "maxLength": 60 },
+        "patientId": { "type": "string", "maxLength": 128 },
+        "patientName": { "type": "string", "maxLength": 120 },
+        "sampleType": { "type": "string", "maxLength": 60 },
+        "tubeColor": { "type": "string", "maxLength": 40 },
+        "status": { "type": "string", "enum": ["pending_collection", "collected", "received", "processing", "completed", "rejected"] },
+        "collectedBy": { "type": "string", "maxLength": 120 },
+        "receivedBy": { "type": "string", "maxLength": 120 },
+        "rejectionReason": { "type": "string", "maxLength": 300 },
+        "notes": { "type": "string", "maxLength": 300 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["bookingId", "accessionNo", "barcodeValue", "patientId", "patientName", "sampleType", "status", "createdBy", "createdAt", "updatedAt"]
+    },
+    "LabReport": {
+      "title": "LabReport",
+      "description": "Diagnostic lab results, validation flags, verification, and approval record.",
+      "type": "object",
+      "properties": {
+        "bookingId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "accessionNo": { "type": "string", "maxLength": 40 },
+        "patientId": { "type": "string", "maxLength": 128 },
+        "patientCode": { "type": "string", "maxLength": 40 },
+        "patientName": { "type": "string", "maxLength": 120 },
+        "patientAge": { "type": "string", "maxLength": 30 },
+        "patientGender": { "type": "string", "maxLength": 16 },
+        "doctorName": { "type": "string", "maxLength": 120 },
+        "results": { "type": "array" },
+        "status": { "type": "string", "enum": ["pending", "entered", "verified", "approved"] },
+        "clinicalNotes": { "type": "string", "maxLength": 1000 },
+        "enteredBy": { "type": "string", "maxLength": 128 },
+        "enteredByName": { "type": "string", "maxLength": 120 },
+        "verifiedBy": { "type": "string", "maxLength": 128 },
+        "verifiedByName": { "type": "string", "maxLength": 120 },
+        "approvedBy": { "type": "string", "maxLength": 128 },
+        "approvedByName": { "type": "string", "maxLength": 120 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["bookingId", "accessionNo", "patientId", "patientName", "results", "status", "createdBy", "createdAt", "updatedAt"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Patient billing payment receipt record.",
+      "type": "object",
+      "properties": {
+        "receiptNo": { "type": "string", "maxLength": 40 },
+        "bookingId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "accessionNo": { "type": "string", "maxLength": 40 },
+        "patientId": { "type": "string", "maxLength": 128 },
+        "patientName": { "type": "string", "maxLength": 120 },
+        "amount": { "type": "number" },
+        "method": { "type": "string", "enum": ["cash", "upi", "card", "bank"] },
+        "referenceNo": { "type": "string", "maxLength": 80 },
+        "notes": { "type": "string", "maxLength": 300 },
+        "paymentDate": { "type": "string", "maxLength": 20 },
+        "receivedBy": { "type": "string", "maxLength": 128 },
+        "receivedByName": { "type": "string", "maxLength": 120 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["receiptNo", "bookingId", "accessionNo", "patientId", "patientName", "amount", "method", "paymentDate", "receivedBy", "createdAt"]
+    },
+    "CashbookEntry": {
+      "title": "CashbookEntry",
+      "description": "Daily income and expense ledger entry.",
+      "type": "object",
+      "properties": {
+        "entryDate": { "type": "string", "maxLength": 20 },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "category": { "type": "string", "maxLength": 80 },
+        "description": { "type": "string", "maxLength": 300 },
+        "amount": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["cash", "upi", "card", "bank"] },
+        "referenceId": { "type": "string", "maxLength": 128 },
+        "recordedBy": { "type": "string", "maxLength": 128 },
+        "recordedByName": { "type": "string", "maxLength": 120 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["entryDate", "type", "category", "description", "amount", "paymentMethod", "recordedBy", "createdAt"]
+    },
+    "HomeCollection": {
+      "title": "HomeCollection",
+      "description": "Home blood/sample collection appointment and phlebotomist tracking.",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string", "maxLength": 128 },
+        "patientName": { "type": "string", "maxLength": 120 },
+        "patientMobile": { "type": "string", "maxLength": 24 },
+        "address": { "type": "string", "maxLength": 300 },
+        "landmark": { "type": "string", "maxLength": 160 },
+        "scheduledDate": { "type": "string", "maxLength": 20 },
+        "scheduledSlot": { "type": "string", "maxLength": 40 },
+        "requestedTests": { "type": "array" },
+        "assignedStaffId": { "type": "string", "maxLength": 128 },
+        "assignedStaffName": { "type": "string", "maxLength": 120 },
+        "status": { "type": "string", "enum": ["scheduled", "en_route", "collected", "delivered_to_lab", "cancelled"] },
+        "bookingId": { "type": "string", "maxLength": 128 },
+        "notes": { "type": "string", "maxLength": 400 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["patientName", "patientMobile", "address", "scheduledDate", "scheduledSlot", "status", "createdBy", "createdAt", "updatedAt"]
+    },
+    "Doctor": {
+      "title": "Doctor",
+      "description": "Referring physician directory and commission terms.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "qualification": { "type": "string", "maxLength": 120 },
+        "specialization": { "type": "string", "maxLength": 120 },
+        "clinicName": { "type": "string", "maxLength": 160 },
+        "mobile": { "type": "string", "maxLength": 24 },
+        "email": { "type": "string", "maxLength": 160 },
+        "commissionPercent": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "isActive", "createdBy", "createdAt", "updatedAt"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Daily staff attendance check-in/check-out log.",
+      "type": "object",
+      "properties": {
+        "staffId": { "type": "string", "maxLength": 128 },
+        "staffName": { "type": "string", "maxLength": 120 },
+        "role": { "type": "string", "maxLength": 40 },
+        "date": { "type": "string", "maxLength": 20 },
+        "checkInTime": { "type": "string", "maxLength": 40 },
+        "checkOutTime": { "type": "string", "maxLength": 40 },
+        "status": { "type": "string", "enum": ["present", "half_day", "absent", "on_leave"] },
+        "notes": { "type": "string", "maxLength": 300 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["staffId", "staffName", "date", "status", "createdBy", "updatedAt"]
+    },
+    "NotificationLog": {
+      "title": "NotificationLog",
+      "description": "WhatsApp and SMS patient notification dispatch log.",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string", "maxLength": 128 },
+        "patientName": { "type": "string", "maxLength": 120 },
+        "mobile": { "type": "string", "maxLength": 24 },
+        "channel": { "type": "string", "enum": ["whatsapp", "sms"] },
+        "eventType": { "type": "string", "enum": ["booking", "payment", "report_ready", "home_collection"] },
+        "message": { "type": "string", "maxLength": 1000 },
+        "status": { "type": "string", "enum": ["queued", "dispatched"] },
+        "referenceId": { "type": "string", "maxLength": 128 },
+        "sentBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["patientName", "mobile", "channel", "eventType", "message", "status", "sentBy", "createdAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable security and operational audit trail.",
+      "type": "object",
+      "properties": {
+        "actorUid": { "type": "string", "maxLength": 128 },
+        "actorName": { "type": "string", "maxLength": 120 },
+        "actorRole": { "type": "string", "maxLength": 40 },
+        "action": { "type": "string", "maxLength": 80 },
+        "module": { "type": "string", "maxLength": 60 },
+        "targetId": { "type": "string", "maxLength": 128 },
+        "summary": { "type": "string", "maxLength": 400 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["actorUid", "actorName", "actorRole", "action", "module", "summary", "createdAt"]
+    },
+    "LabSettings": {
+      "title": "LabSettings",
+      "description": "Laboratory configuration, branding, report templates, and backup metadata.",
+      "type": "object",
+      "properties": {
+        "labName": { "type": "string", "maxLength": 160 },
+        "tagline": { "type": "string", "maxLength": 200 },
+        "address": { "type": "string", "maxLength": 300 },
+        "phone": { "type": "string", "maxLength": 60 },
+        "email": { "type": "string", "maxLength": 160 },
+        "regNumber": { "type": "string", "maxLength": 80 },
+        "authorizedSignatoryName": { "type": "string", "maxLength": 120 },
+        "authorizedSignatoryTitle": { "type": "string", "maxLength": 120 },
+        "reportHeaderColor": { "type": "string", "maxLength": 20 },
+        "reportFooterNote": { "type": "string", "maxLength": 400 },
+        "logoDataUrl": { "type": "string", "maxLength": 150000 },
+        "signatureDataUrl": { "type": "string", "maxLength": 150000 },
+        "lastBackupAt": { "type": "string", "maxLength": 40 },
+        "updatedBy": { "type": "string", "maxLength": 128 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["labName", "updatedBy", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserAccount" },
+      "description": "Staff user accounts and RBAC role assignments."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateContact" },
+      "description": "Isolated PII contact details for a user."
+    },
+    "/staffInvites/{inviteId}": {
+      "schema": { "$ref": "#/entities/StaffInvite" },
+      "description": "Admin-created staff role invitations."
+    },
+    "/patients/{patientId}": {
+      "schema": { "$ref": "#/entities/Patient" },
+      "description": "Registered laboratory patients."
+    },
+    "/tests/{testId}": {
+      "schema": { "$ref": "#/entities/LabTest" },
+      "description": "Laboratory test catalog and configurable reference ranges."
+    },
+    "/bookings/{bookingId}": {
+      "schema": { "$ref": "#/entities/Booking" },
+      "description": "Patient test bookings, accession numbers, and invoice totals."
+    },
+    "/samples/{sampleId}": {
+      "schema": { "$ref": "#/entities/Sample" },
+      "description": "Specimen collection and barcode tracking."
+    },
+    "/labReports/{reportId}": {
+      "schema": { "$ref": "#/entities/LabReport" },
+      "description": "Diagnostic lab test results, verification, and approval."
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/Payment" },
+      "description": "Payment receipts against bookings."
+    },
+    "/cashbook/{entryId}": {
+      "schema": { "$ref": "#/entities/CashbookEntry" },
+      "description": "Daily income and expense ledger."
+    },
+    "/homeCollections/{collectionId}": {
+      "schema": { "$ref": "#/entities/HomeCollection" },
+      "description": "Home sample collection appointments."
+    },
+    "/doctors/{doctorId}": {
+      "schema": { "$ref": "#/entities/Doctor" },
+      "description": "Referring doctors directory."
+    },
+    "/attendance/{attendanceId}": {
+      "schema": { "$ref": "#/entities/Attendance" },
+      "description": "Staff daily attendance records."
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/NotificationLog" },
+      "description": "WhatsApp and SMS notification dispatch history."
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Immutable security and operational audit logs."
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/LabSettings" },
+      "description": "Laboratory configuration, branding, templates, and backup metadata."
+    }
+  }
+}
