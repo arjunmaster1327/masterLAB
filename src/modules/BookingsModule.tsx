@@ -14,6 +14,13 @@ import { buildWhatsAppUrl, formatCurrency } from '../utils/labCalculations';
 import { generateInvoicePdf } from '../utils/pdfGenerator';
 import { BarcodeCanvas, PrintStickerButton } from '../components/BarcodeCanvas';
 
+const COMBO_PACKAGES = [
+  { id: 'basic', name: 'Basic Wellness', description: 'CBC + Fasting Sugar + Urine Routine', codes: ['CBC', 'SUGAR', 'URINE'], price: 599 },
+  { id: 'diabetes', name: 'Diabetes Care', description: 'Sugar + HbA1c + Lipid Profile + Urine Routine', codes: ['SUGAR', 'HBA1C', 'LIPID', 'URINE'], price: 1099 },
+  { id: 'kidney', name: 'Kidney Care', description: 'KFT + CBC + Urine Routine', codes: ['KFT', 'CBC', 'URINE'], price: 899 },
+  { id: 'fullbody', name: 'Full Body Check-up', description: 'CBC, LFT, KFT, Lipid, Sugar, HbA1c, Thyroid + Urine', codes: ['CBC', 'LFT', 'KFT', 'LIPID', 'SUGAR', 'HBA1C', 'THYROID', 'URINE'], price: 2499 },
+];
+
 export const BookingsModule: React.FC = () => {
   const {
     patients,
@@ -43,7 +50,7 @@ export const BookingsModule: React.FC = () => {
 
   const [doctorId, setDoctorId] = useState('');
   const [testSearch, setTestSearch] = useState('');
-  const [selectedTestIds, setSelectedTestIds] = useState<string[]>([]);
+  const [selectedTestIds, setSelectedTestIds] = useState<string[]>([]);\n  const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
   const [discount, setDiscount] = useState('0');
   const [discountReason, setDiscountReason] = useState('');
   const [collectionType, setCollectionType] = useState<'walk_in' | 'home_collection'>('walk_in');
@@ -99,6 +106,21 @@ export const BookingsModule: React.FC = () => {
   const netAmount = Math.max(0, subtotal - discountVal);
   const paidVal = paidInput === '' ? netAmount : Math.max(0, Math.min(netAmount, Number(paidInput) || 0));
   const dueAmount = Math.max(0, netAmount - paidVal);
+
+  const applyPackage = (pkg: typeof COMBO_PACKAGES[number]) => {
+    const matched = tests.filter((test) => pkg.codes.includes(test.code) && test.isActive);
+    if (matched.length !== pkg.codes.length) {
+      pushToast('error', 'Some tests in this package are not available in the active catalogue.');
+      return;
+    }
+    const regularTotal = matched.reduce((sum, test) => sum + test.price, 0);
+    setSelectedTestIds(matched.map((test) => test.id));
+    setSelectedPackageId(pkg.id);
+    setDiscount(String(Math.max(0, regularTotal - pkg.price)));
+    setDiscountReason(pkg.name + ' combo offer');
+    setPaidInput('');
+    pushToast('success', pkg.name + ' package selected.');
+  };
 
   const toggleTest = (id: string) => {
     setSelectedTestIds((prev) =>
@@ -419,6 +441,24 @@ export const BookingsModule: React.FC = () => {
                     className="w-full rounded-lg border border-slate-300 pl-9 pr-3 py-1.5 text-xs focus:border-sky-600 focus:outline-none"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-slate-700">Value Combo Packages · Prices in ₹</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {COMBO_PACKAGES.map((pkg) => (
+                    <button key={pkg.id} type="button" onClick={() => applyPackage(pkg)}
+                      className={`rounded-xl border p-3 text-left transition-colors ${selectedPackageId === pkg.id ? 'border-sky-700 bg-sky-50' : 'border-emerald-200 bg-emerald-50/40 hover:border-emerald-400'}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-slate-900">{pkg.name}</span>
+                        <span className="text-sm font-bold text-emerald-700">{formatCurrency(pkg.price)}</span>
+                      </div>
+                      <div className="mt-1 text-[11px] text-slate-600">{pkg.description}</div>
+                      <div className="mt-1 text-[10px] font-semibold text-emerald-700">Select package</div>
+                    </button>
+                  ))}
+                </div>
+                <div className="text-[10px] text-slate-500">Suggested introductory prices. Confirm actual rates and test availability before use.</div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-96 overflow-y-auto pr-1">
